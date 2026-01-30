@@ -1,4 +1,4 @@
-name: Customer Redmine Daily Report
+name: QA Redmine Daily Report
 
 on:
   schedule:
