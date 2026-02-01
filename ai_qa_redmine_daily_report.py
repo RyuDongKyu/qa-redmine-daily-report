@@ -21,21 +21,34 @@ RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 JSON_KEY_FILE = "service_key.json"
 
 # ==========================================
-# 2. 데이터 추출 (제외 로직 추가됨)
+# 2. 데이터 추출 (KST 시간 보정 + 제외 로직)
 # ==========================================
 def get_yesterday_issues():
     print("🌐 구글 시트 데이터 추출 중...")
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(JSON_KEY_FILE, scope)
-    g_client = gspread.authorize(creds)
-    sheet = g_client.open_by_key(SHEET_ID).worksheet("통합_issues")
-    all_data = sheet.get_all_values()
-    rows = all_data[1:]
+    try:
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name(JSON_KEY_FILE, scope)
+        g_client = gspread.authorize(creds)
+        sheet = g_client.open_by_key(SHEET_ID).worksheet("통합_issues")
+        all_data = sheet.get_all_values()
+        rows = all_data[1:]
+    except Exception as e:
+        print(f"❌ 구글 시트 접속 실패: {e}")
+        return "", []
 
-    now = datetime.now() - timedelta(days=1)
-    target_dash = now.strftime('%Y-%m-%d')
-    target_dot = now.strftime('%Y. %m. %d.').replace('. 0', '. ')
+    # [수정됨] GitHub 서버(UTC) 시간을 한국 시간(KST)으로 변환 후 어제 날짜 계산
+    # UTC 현재 시간 가져오기
+    utc_now = datetime.utcnow()
+    # KST = UTC + 9시간
+    kst_now = utc_now + timedelta(hours=9)
+    # KST 기준 어제 날짜
+    target_date = kst_now - timedelta(days=1)
+
+    target_dash = target_date.strftime('%Y-%m-%d')
+    target_dot = target_date.strftime('%Y. %m. %d.').replace('. 0', '. ')
     if target_dot.startswith('0'): target_dot = target_dot[1:]
+    
+    print(f"📅 한국 시간 기준 어제 날짜: {target_dash}")
 
     filtered_rows = []
     for row in rows:
@@ -45,16 +58,15 @@ def get_yesterday_issues():
             
             if target_dash in input_time or target_dot in input_time:
                 # 2. 필수 조건 확인 (42열 값 존재 여부)
-                # 인덱스 41 = 42번째 열 (AP)
                 col_42_val = row[41].strip() if len(row) > 41 else ""
                 
-                # [수정됨] 42열(AP)에 값이 없으면 제외 (값이 있는 경우에만 추출)
+                # 42열(AP)에 값이 없으면 제외
                 if not col_42_val:
                     continue
 
                 # 3. 외부 유입 확인 (등록자 공란)
-                qa_reg = row[24].strip() if len(row) > 24 else "" # Y열
-                dev_reg = row[25].strip() if len(row) > 25 else "" # Z열
+                qa_reg = row[24].strip() if len(row) > 24 else "" 
+                dev_reg = row[25].strip() if len(row) > 25 else "" 
 
                 if not qa_reg and not dev_reg:
                     filtered_rows.append({
