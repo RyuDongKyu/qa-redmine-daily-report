@@ -2,7 +2,9 @@ name: QA Redmine Daily Report
 
 on:
   schedule:
-    - cron: '50 22 * * *'
+    # 한국 시간(KST) 오전 08:00 실행
+    # 계산: 08:00 - 9시간 = (전날) 23:00
+    - cron: '0 23 * * *'
   workflow_dispatch:
 
 jobs:
