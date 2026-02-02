@@ -152,7 +152,7 @@ def ask_gemini(date_str, issues):
     아래 [작성 원칙 v9.5]와 [인라인 HTML 가이드]를 반드시 **100% 준수**하여 본문을 작성하세요.
 
     [작성 원칙 v9.5 - 필수 준수 사항]
-    1. 인사말: "안녕하세요, {date_str} 접수된 외부 유입 이슈 리포트입니다."로 시작할 것.
+    1. 인사말: "안녕하세요, {date_str} 등록된 QA 이슈 리포트입니다."로 시작할 것.
     2. 그룹화: 'category'별로 섹션을 나눌 것. (예: <h3 class='cat-title'>📂 프로젝트명</h3>)
     3. 테이블 순서: 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI) 순서로 컬럼을 배치할 것.
     4. 요약(AI) 처리: 'content'를 **반드시 한국어 두 문장**으로 핵심만 요약하여 '요약(AI)' 컬럼에 넣을 것.
@@ -215,6 +215,6 @@ if __name__ == "__main__":
     y_date, issues = get_yesterday_issues()
     if issues:
         final_html = ask_gemini(y_date, issues)
-        send_email(f"[일일보고] {y_date} 외부 유입 레드마인 이슈 현황", final_html)
+        send_email(f"[일일보고] {y_date} QA 등록 레드마인 이슈 현황", final_html)
     else:
-        send_email(f"[일일보고] {y_date} 외부 유입 이슈 없음", f"<h3>{y_date} 자 등록된 이슈가 없습니다.</h3>")
+        send_email(f"[일일보고] {y_date} QA 등록 레드마인 이슈 없음", f"<h3>{y_date} 자 등록된 이슈가 없습니다.</h3>")
