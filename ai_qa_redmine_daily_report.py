@@ -149,16 +149,21 @@ def ask_gemini(date_str, issues):
     # [수정됨] 필수 준수 사항을 강력하게 명시
     prompt = f"""
     당신은 'Redmine Daily Report Agent'입니다. 
-    아래 [작성 원칙 v9.0]을 **절대적인 기준**으로 삼아 HTML 본문을 작성하세요.
-    이 원칙들은 **필수적으로** 지켜져야 하며, 예외는 허용되지 않습니다.
+    아래 [작성 원칙 v9.5]와 [인라인 HTML 가이드]를 반드시 **100% 준수**하여 본문을 작성하세요.
 
-    [작성 원칙 v9.0 - 필수 준수 사항]
-    1. 인사말: "안녕하세요, {date_str} 등록된 QA 이슈 이슈 리포트입니다."로 시작할 것.
-    2. 그룹화: 'category' 값(프로젝트명)을 기준으로 섹션을 반드시 나눌 것. (예: <h3>📂 프로젝트명</h3>)
+    [작성 원칙 v9.5 - 필수 준수 사항]
+    1. 인사말: "안녕하세요, {date_str} 접수된 외부 유입 이슈 리포트입니다."로 시작할 것.
+    2. 그룹화: 'category'별로 섹션을 나눌 것. (예: <h3 class='cat-title'>📂 프로젝트명</h3>)
     3. 테이블 순서: 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI) 순서로 컬럼을 배치할 것.
-    4. 요약(AI) 처리: 'content' 내용을 핵심만 **두 문장**으로 요약
+    4. 요약(AI) 처리: 'content'를 **반드시 한국어 두 문장**으로 핵심만 요약하여 '요약(AI)' 컬럼에 넣을 것.
     5. 링크 생성: 번호(#no)에는 반드시 <a href="https://projects.rsupport.com/issues/{{no}}">#{{no}}</a> 링크를 적용할 것.
-    6. 데이터 변형 금지: 제목, 등록자, 담당자 등의 텍스트는 원문 그대로 유지할 것.
+    6. 데이터 변형 금지: 제목, 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자 등의 텍스트는 원문 그대로 유지할 것.
+
+    [인라인 HTML 가이드 - 필수 적용]
+    - <table style="width:100%; border-collapse:collapse; font-family:'Malgun Gothic',sans-serif; font-size:12px; border:1px solid #ddd;">
+    - <th style="background-color:#f2f2f2; border:1px solid #ddd; padding:8px; font-weight:bold; text-align:center;">
+    - <td style="border:1px solid #ddd; padding:8px; text-align:left;">
+    - <td style="border:1px solid #ddd; padding:8px; text-align:center;"> (번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI))
 
     데이터: {json.dumps(issues, ensure_ascii=False)}
     """
