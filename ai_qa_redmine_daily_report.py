@@ -226,4 +226,4 @@ if __name__ == "__main__":
         final_html = ask_gemini(y_date, issues)
         send_email(f"[일일보고] {y_date} QA 이슈 등록 현황", final_html)
     else:
-        send_email(f"[일일보고] {y_date} QA 이슈 등록 없음", f"<h3>{y_date} 자 등록된 QA 이슈가 없습니다.</h3>")
+        send_email(f"[일일보고] {y_date} QA 이슈 등록 없음", f"<h3>{y_date} 등록된 QA 이슈가 없습니다.</h3>")
