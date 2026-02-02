@@ -194,20 +194,29 @@ def ask_gemini(date_str, issues):
     return generate_manual_report(date_str, issues, last_error)
 
 # ==========================================
-# 5. 메일 발송
+# 5. 메일 발송 (다중 수신자 지원 수정됨)
 # ==========================================
 def send_email(subject, body):
+    # [수정] 이메일 주소가 콤마(,)로 구분되어 있을 경우 리스트로 변환
+    if "," in RECIPIENT_EMAIL:
+        recipient_list = [addr.strip() for addr in RECIPIENT_EMAIL.split(',')]
+    else:
+        recipient_list = [RECIPIENT_EMAIL.strip()]
+
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
-    msg['To'] = RECIPIENT_EMAIL
+    # 헤더에는 보기 좋게 콤마로 합쳐서 표시 (예: "a@test.com, b@test.com")
+    msg['To'] = ", ".join(recipient_list) 
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
+    
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as s:
             s.starttls()
             s.login(SENDER_EMAIL, SENDER_PASSWORD)
+            # send_message는 헤더(To)에 적힌 모든 수신자에게 자동으로 발송합니다.
             s.send_message(msg)
-        print("✅ 메일 발송 완료")
+        print(f"✅ 메일 발송 완료 (수신자: {len(recipient_list)}명)")
     except Exception as e:
         print(f"❌ 메일 발송 실패: {e}")
 
