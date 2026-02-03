@@ -178,7 +178,8 @@ def ask_gemini(date_str, issues):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
             print(f"🤖 AI 호출 시도: {model} ...")
-            res = requests.post(url, headers=headers, json=data, timeout=30)
+            # 데이터가 많을 경우를 대비해 timeout 120초 유지
+            res = requests.post(url, headers=headers, json=data, timeout=120)
             
             if res.status_code == 200:
                 print(f"✅ AI 리포트 생성 성공! (모델: {model})")
@@ -187,15 +188,22 @@ def ask_gemini(date_str, issues):
                 raw_text = res.json()['candidates'][0]['content']['parts'][0]['text']
                 clean_html = raw_text.replace('```html', '').replace('```', '').strip()
                 
-                # 2. [추가됨] 성공한 모델명을 표시하는 파란색 HTML 문구 생성
-                success_msg = f"<p style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 5px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: {model})</p>"
+                # [핵심 수정] 파이썬에서 직접 순서를 조립하여 출력 위치 강제 고정
                 
-                # 3. [추가됨] 인사말(</h2>) 바로 뒤에 성공 문구 삽입
-                if "</h2>" in clean_html:
-                    final_html = clean_html.replace("</h2>", f"</h2>{success_msg}")
-                else:
-                    final_html = success_msg + clean_html
-                    
+                # (1) 인사말을 파이썬이 직접 생성 (가장 윗줄 보장)
+                greeting_html = f"<h2>안녕하세요, {date_str} QA 등록 이슈 리포트입니다.</h2>"
+                
+                # (2) 파란색 성공 문구 생성 (인사말 바로 다음 줄 보장)
+                success_msg = f"<div style='color: #0052cc; font-size: 12px; font-weight: bold; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: {model})</div>"
+                
+                # (3) AI가 혹시 인사말을 중복으로 넣었다면 제거 (깔끔한 연결)
+                # (AI 프롬프트에서 인사말을 빼라고 했더라도 안전장치로 추가)
+                clean_html = clean_html.replace(f"안녕하세요, {date_str} QA 등록 이슈 리포트입니다.", "")
+                clean_html = clean_html.replace("<h2></h2>", "") # 빈 태그 제거
+
+                # (4) 최종 합치기: [인사말] + [성공문구] + [AI데이터]
+                final_html = greeting_html + success_msg + clean_html
+                
                 return final_html
 
             elif res.status_code == 429:
