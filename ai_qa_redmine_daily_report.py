@@ -169,7 +169,7 @@ def ask_gemini(date_str, issues):
     """
     
     #candidate_models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-pro"]
-    candidate_models = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    candidate_models = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite","gemini-1.5-flash", "gemini-1.5-pro"]
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
@@ -182,8 +182,23 @@ def ask_gemini(date_str, issues):
             res = requests.post(url, headers=headers, json=data, timeout=30)
             
             if res.status_code == 200:
-                print("✅ AI 리포트 생성 성공!")
-                return res.json()['candidates'][0]['content']['parts'][0]['text'].replace('```html', '').replace('```', '').strip()
+                print(f"✅ AI 리포트 생성 성공! (모델: {model})")
+                
+                # 1. AI 응답 텍스트 추출 및 마크다운 제거
+                raw_text = res.json()['candidates'][0]['content']['parts'][0]['text']
+                clean_html = raw_text.replace('```html', '').replace('```', '').strip()
+                
+                # 2. [추가됨] 성공한 모델명을 표시하는 파란색 HTML 문구 생성
+                success_msg = f"<p style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 5px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: {model})</p>"
+                
+                # 3. [추가됨] 인사말(</h2>) 바로 뒤에 성공 문구 삽입
+                if "</h2>" in clean_html:
+                    final_html = clean_html.replace("</h2>", f"</h2>{success_msg}")
+                else:
+                    final_html = success_msg + clean_html
+                    
+                return final_html
+
             elif res.status_code == 429:
                 time.sleep(5)
             else:
