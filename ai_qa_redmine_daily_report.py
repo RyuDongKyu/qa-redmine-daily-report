@@ -175,7 +175,6 @@ def ask_gemini(date_str, issues):
     last_error = ""
 
     for model in candidate_models:
-        # 모델명 에러(404) 방지를 위해 정확한 엔드포인트 사용 확인
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
             print(f"🤖 AI 호출 시도: {model} ...")
@@ -184,17 +183,17 @@ def ask_gemini(date_str, issues):
             if res.status_code == 200:
                 print(f"✅ AI 리포트 생성 성공! (모델: {model})")
                 
+                # 1. AI 응답 텍스트 추출 및 마크다운 제거
                 raw_text = res.json()['candidates'][0]['content']['parts'][0]['text']
                 clean_html = raw_text.replace('```html', '').replace('```', '').strip()
                 
-                # [수정] 인사말 다음 줄에 표시하기 위해 div 태그로 변경하고 여백 조절
-                success_msg = f"<div style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 10px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: {model})</div>"
+                # 2. [추가됨] 성공한 모델명을 표시하는 파란색 HTML 문구 생성
+                success_msg = f"<p style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 5px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: {model})</p>"
                 
-                # [핵심] </h2> 태그(인사말 끝) 바로 뒤에 문구를 삽입하여 다음 줄에 출력되게 함
+                # 3. [추가됨] 인사말(</h2>) 바로 뒤에 성공 문구 삽입
                 if "</h2>" in clean_html:
                     final_html = clean_html.replace("</h2>", f"</h2>{success_msg}")
                 else:
-                    # 인사말 태그가 없을 경우 맨 앞에 삽입
                     final_html = success_msg + clean_html
                     
                 return final_html
