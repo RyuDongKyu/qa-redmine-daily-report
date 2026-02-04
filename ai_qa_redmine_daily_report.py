@@ -168,7 +168,7 @@ def ask_gemini(date_str, issues):
     데이터: {json.dumps(issues, ensure_ascii=False)}
     """
 
-    candidate_models = ["gemini-3.0-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite","gemini-1.5-flash"]
+    candidate_models = ["gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite","gemini-1.5-flash"]
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
