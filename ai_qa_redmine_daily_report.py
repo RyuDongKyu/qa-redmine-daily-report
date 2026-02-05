@@ -64,23 +64,18 @@ def get_yesterday_issues():
                 if not col_42_val:
                     continue
 
-                # 3. 외부 유입 확인 (등록자 공란)
-                qa_reg = row[24].strip() if len(row) > 24 else "" 
-                dev_reg = row[25].strip() if len(row) > 25 else "" 
-
-                if not qa_reg and not dev_reg:
-                    filtered_rows.append({
-                        "no": row[0].strip(),
-                        "category": row[1].strip() if len(row) > 1 else "미분류",
-                        "type": row[3].strip() if len(row) > 3 else "",
-                        "status": row[5].strip() if len(row) > 5 else "",
-                        "priority": row[6].strip() if len(row) > 6 else "",
-                        "title": row[7].strip() if len(row) > 7 else "",
-                        "registrar": row[8].strip() if len(row) > 8 else "",
-                        "manager": row[9].strip() if len(row) > 9 else "",
-                        "date": input_time[:10],
-                        "content": " | ".join([row[i].strip() for i in range(27, 32) if len(row) > i and row[i].strip()])
-                    })
+                filtered_rows.append({          # <-- 왼쪽으로 당겨짐 (위의 if문과 같은 라인)
+                "no": row[0].strip(),
+                "category": row[1].strip() if len(row) > 1 else "미분류",
+                "type": row[3].strip() if len(row) > 3 else "",
+                "status": row[5].strip() if len(row) > 5 else "",
+                "priority": row[6].strip() if len(row) > 6 else "",
+                "title": row[7].strip() if len(row) > 7 else "",
+                "registrar": row[8].strip() if len(row) > 8 else "",
+                "manager": row[9].strip() if len(row) > 9 else "",
+                "date": input_time[:10],
+                "content": " | ".join([row[i].strip() for i in range(27, 32) if len(row) > i and row[i].strip()])
+            })
         except: continue
         
     print(f"📝 필터링 후 추출된 이슈 수: {len(filtered_rows)}건")
@@ -168,7 +163,7 @@ def ask_gemini(date_str, issues):
     데이터: {json.dumps(issues, ensure_ascii=False)}
     """
 
-    candidate_models = ["gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite","gemini-1.5-flash"]
+    candidate_models = ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
