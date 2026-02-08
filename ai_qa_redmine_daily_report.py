@@ -36,19 +36,37 @@ def get_yesterday_issues():
         print(f"❌ 구글 시트 접속 실패: {e}")
         return "", []
 
-    # [수정됨] GitHub 서버(UTC) 시간을 한국 시간(KST)으로 변환 후 어제 날짜 계산
-    # UTC 현재 시간 가져오기
+    # [수정] 날짜 계산 로직: 월요일이면 금~일 데이터 추출
     utc_now = datetime.utcnow()
-    # KST = UTC + 9시간
     kst_now = utc_now + timedelta(hours=9)
-    # KST 기준 어제 날짜
-    target_date = kst_now - timedelta(days=1)
+    current_weekday = kst_now.weekday()  # 0:월, 1:화, ..., 6:일
 
-    target_dash = target_date.strftime('%Y-%m-%d')
-    target_dot = target_date.strftime('%Y. %m. %d.').replace('. 0', '. ')
-    if target_dot.startswith('0'): target_dot = target_dot[1:]
-    
-    print(f"📅 한국 시간 기준 어제 날짜: {target_dash}")
+    target_dates = []
+    if current_weekday == 0:  # 월요일(0)인 경우
+        print("📅 오늘은 월요일입니다. 금, 토, 일 데이터를 추출합니다.")
+        # 금(3일 전), 토(2일 전), 일(1일 전)
+        for i in [3, 2, 1]:
+            target_dates.append(kst_now - timedelta(days=i))
+    else:
+        # 평일인 경우 어제(1일 전) 데이터만 추출
+        target_dates.append(kst_now - timedelta(days=1))
+
+    # 비교를 위한 날짜 포맷 리스트 생성 (2024-05-20 및 2024. 5. 20. 형태 모두 대응)
+    target_formats = []
+    for d in target_dates:
+        dash = d.strftime('%Y-%m-%d')
+        dot = d.strftime('%Y. %m. %d.').replace('. 0', '. ')
+        if dot.startswith('0'): dot = dot[1:]
+        target_formats.append(dash)
+        target_formats.append(dot)
+
+    # 메일 제목 등에 표시될 날짜 문자열 결정
+    if len(target_dates) > 1:
+        date_display = f"{target_dates[0].strftime('%Y-%m-%d')} ~ {target_dates[-1].strftime('%Y-%m-%d')}"
+    else:
+        date_display = target_dates[0].strftime('%Y-%m-%d')
+
+    print(f"📅 대상 기간: {date_display}")
 
     filtered_rows = []
     for row in rows:
@@ -56,7 +74,10 @@ def get_yesterday_issues():
             # 1. 날짜 확인 (AJ열 = 인덱스 35)
             input_time = row[35].strip() if len(row) > 35 else ""
             
-            if target_dash in input_time or target_dot in input_time:
+            # [수정] 대상 날짜 리스트 중 하나라도 시트 날짜에 포함되어 있는지 확인
+            is_target_day = any(fmt in input_time for fmt in target_formats)
+            
+            if is_target_day:
                 # 2. 필수 조건 확인 (42열 값 존재 여부)
                 col_42_val = row[41].strip() if len(row) > 41 else ""
                 
@@ -64,22 +85,22 @@ def get_yesterday_issues():
                 if not col_42_val:
                     continue
 
-                filtered_rows.append({          # <-- 왼쪽으로 당겨짐 (위의 if문과 같은 라인)
-                "no": row[0].strip(),
-                "category": row[1].strip() if len(row) > 1 else "미분류",
-                "type": row[3].strip() if len(row) > 3 else "",
-                "status": row[5].strip() if len(row) > 5 else "",
-                "priority": row[6].strip() if len(row) > 6 else "",
-                "title": row[7].strip() if len(row) > 7 else "",
-                "registrar": row[8].strip() if len(row) > 8 else "",
-                "manager": row[9].strip() if len(row) > 9 else "",
-                "date": input_time[:10],
-                "content": " | ".join([row[i].strip() for i in range(27, 32) if len(row) > i and row[i].strip()])
-            })
+                filtered_rows.append({
+                    "no": row[0].strip(),
+                    "category": row[1].strip() if len(row) > 1 else "미분류",
+                    "type": row[3].strip() if len(row) > 3 else "",
+                    "status": row[5].strip() if len(row) > 5 else "",
+                    "priority": row[6].strip() if len(row) > 6 else "",
+                    "title": row[7].strip() if len(row) > 7 else "",
+                    "registrar": row[8].strip() if len(row) > 8 else "",
+                    "manager": row[9].strip() if len(row) > 9 else "",
+                    "date": input_time[:10],
+                    "content": " | ".join([row[i].strip() for i in range(27, 32) if len(row) > i and row[i].strip()])
+                })
         except: continue
         
     print(f"📝 필터링 후 추출된 이슈 수: {len(filtered_rows)}건")
-    return target_dash, filtered_rows
+    return date_display, filtered_rows
 
 # ==========================================
 # 3. 수동 리포트 생성기 (AI 실패 시 작동)
