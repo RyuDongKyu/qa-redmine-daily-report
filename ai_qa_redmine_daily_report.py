@@ -13,7 +13,8 @@ import time
 # ==========================================
 # 1. 환경 설정
 # ==========================================
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+#GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+KIMI_API_KEY = os.getenv("KIMI_API_KEY")
 SHEET_ID = os.getenv("SHEET_ID")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
@@ -227,6 +228,99 @@ def ask_gemini(date_str, issues):
     return generate_manual_report(date_str, issues, last_error)
 
 # ==========================================
+# 4. Kimi(Moonshot) 리포트 생성
+# ==========================================
+def ask_kimi(date_str, issues):
+    # [설정] 시스템 프롬프트 (HTML 가이드)
+    system_prompt = f"""
+    당신은 'Redmine Daily Report Agent'입니다.
+    아래 [작성 원칙 v9.5]와 [인라인 HTML 가이드]를 반드시 **100% 준수**하여 본문을 작성하세요.
+
+    [작성 원칙 v9.5 - 필수 준수 사항]
+    1. 인사말: "안녕하세요, {date_str} QA 등록 이슈 리포트입니다."로 시작할 것.
+    2. 그룹화: 'category'별로 섹션을 나눌 것. (예: <h3 class='cat-title'>📂 프로젝트명</h3>)
+    3. 테이블 순서: 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI) 순서로 컬럼을 배치할 것.
+    4. 요약(AI) 처리: 'content'를 **반드시 한국어 두 문장**으로 핵심만 요약하여 '요약(AI)' 컬럼에 넣을 것.
+    5. 링크 생성: 번호(#no)에는 반드시 <a href="https://projects.rsupport.com/issues/{{no}}">#{{no}}</a> 링크를 적용할 것.
+    6. 데이터 변형 금지: 제목, 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자 등의 텍스트는 원문 그대로 유지할 것.
+
+    [인라인 HTML 가이드 - 필수 적용]
+    - <table style="width:100%; border-collapse:collapse; font-family:'Malgun Gothic',sans-serif; font-size:12px; border:1px solid #ddd;">
+    - <th style="background-color:#f2f2f2; border:1px solid #ddd; padding:8px; font-weight:bold; text-align:center;">
+    - <td style="border:1px solid #ddd; padding:8px; text-align:left;">
+    - <td style="border:1px solid #ddd; padding:8px; text-align:center;"> (번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI))
+    """
+
+    # [설정] 사용자 메시지 (데이터)
+    user_content = f"데이터: {json.dumps(issues, ensure_ascii=False)}"
+
+    # [변경] Moonshot API 사용 (Kimi)
+    # 8k 모델을 우선 시도하고, 실패 시 32k나 다른 모델 시도 가능
+    candidate_models = ["kimi-k2.5", "moonshot-v1-8k", "moonshot-v1-32k"]
+    
+    url = "https://api.moonshot.cn/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {KIMI_API_KEY}"
+    }
+
+    last_error = ""
+
+    for model in candidate_models:
+        try:
+            print(f"🤖 Kimi(Moonshot) 호출 시도: {model} ...")
+            
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content}
+                ],
+                "temperature": 0.3
+            }
+
+            # 대량 데이터 처리를 위해 타임아웃 120초 설정
+            res = requests.post(url, headers=headers, json=payload, timeout=120)
+            
+            if res.status_code == 200:
+                print(f"✅ AI 리포트 생성 성공! (모델: {model})")
+                
+                # 응답 파싱 (OpenAI 포맷 호환)
+                raw_text = res.json()['choices'][0]['message']['content']
+                clean_html = raw_text.replace('```html', '').replace('```', '').strip()
+                
+                # [순서 강제 조립] 인사말 -> 성공메시지 -> 테이블
+                
+                # 1. 인사말
+                greeting_html = f"<h2>안녕하세요, {date_str} QA 등록 이슈 리포트입니다.</h2>"
+                
+                # 2. 파란색 성공 메시지
+                success_msg = f"<div style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 10px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: Kimi - {model})</div>"
+                
+                # 3. AI가 실수로 넣었을지 모를 인사말 제거
+                clean_html = clean_html.replace(f"안녕하세요, {date_str} QA 등록 이슈 리포트입니다.", "")
+                clean_html = clean_html.replace("<h2></h2>", "")
+
+                # 4. 최종 합치기
+                final_html = greeting_html + success_msg + clean_html
+                
+                return final_html
+
+            elif res.status_code == 429:
+                print("⏳ 사용량 제한(Rate Limit), 5초 대기...")
+                time.sleep(5)
+            else:
+                last_error = f"{model} Error ({res.status_code}): {res.text}"
+                print(f"⚠️ {last_error}")
+
+        except Exception as e:
+            last_error = str(e)
+            print(f"⚠️ 에러 발생: {e}")
+            continue
+
+    return generate_manual_report(date_str, issues, last_error)
+
+# ==========================================
 # 5. 메일 발송 (다중 수신자 지원 수정됨)
 # ==========================================
 def send_email(subject, body):
@@ -256,7 +350,8 @@ def send_email(subject, body):
 if __name__ == "__main__":
     y_date, issues = get_yesterday_issues()
     if issues:
-        final_html = ask_gemini(y_date, issues)
+        #final_html = ask_gemini(y_date, issues)
+        final_html = ask_kimi(y_date, issues)
         send_email(f"[일일보고] {y_date} QA 등록 이슈 현황", final_html)
     else:
         send_email(f"[일일보고] {y_date} QA 등록 이슈 없음", f"<h3>{y_date} 등록된 QA 이슈가 없습니다.</h3>")
