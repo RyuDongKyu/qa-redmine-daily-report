@@ -13,22 +13,13 @@ import time
 # ==========================================
 # 1. 환경 설정
 # ==========================================
-#GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-raw_key = os.getenv("KIMI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SHEET_ID = os.getenv("SHEET_ID")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 JSON_KEY_FILE = "service_key.json"
 
-if raw_key:
-    # 1. 앞뒤 공백 제거 (.strip)
-    # 2. 따옴표 제거 (.replace)
-    KIMI_API_KEY = raw_key.strip().replace('"', '').replace("'", "")
-    print(f"🔑 API Key 로드 및 정제 완료! (길이: {len(KIMI_API_KEY)})")
-else:
-    KIMI_API_KEY = None
-    print("❌ API Key가 없습니다.")
 # ==========================================
 # 2. 데이터 추출 (KST 시간 보정 + 제외 로직)
 # ==========================================
@@ -237,111 +228,6 @@ def ask_gemini(date_str, issues):
     return generate_manual_report(date_str, issues, last_error)
 
 # ==========================================
-# 4. Kimi(Moonshot) 리포트 생성
-# ==========================================
-def ask_kimi(date_str, issues):
-    # [설정] 시스템 프롬프트 (HTML 가이드)
-    system_prompt = f"""
-    당신은 'Redmine Daily Report Agent'입니다.
-    아래 [작성 원칙 v9.5]와 [인라인 HTML 가이드]를 반드시 **100% 준수**하여 본문을 작성하세요.
-
-    [작성 원칙 v9.5 - 필수 준수 사항]
-    1. 인사말: "안녕하세요, {date_str} QA 등록 이슈 리포트입니다."로 시작할 것.
-    2. 그룹화: 'category'별로 섹션을 나눌 것. (예: <h3 class='cat-title'>📂 프로젝트명</h3>)
-    3. 테이블 순서: 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI) 순서로 컬럼을 배치할 것.
-    4. 요약(AI) 처리: 'content'를 **반드시 한국어 두 문장**으로 핵심만 요약하여 '요약(AI)' 컬럼에 넣을 것.
-    5. 링크 생성: 번호(#no)에는 반드시 <a href="https://projects.rsupport.com/issues/{{no}}">#{{no}}</a> 링크를 적용할 것.
-    6. 데이터 변형 금지: 제목, 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자 등의 텍스트는 원문 그대로 유지할 것.
-    7. **누락 금지:** 입력된 {len(issues)}개의 이슈를 하나도 빠짐없이 모두 테이블에 출력할 것.
-
-    [인라인 HTML 가이드 - 필수 적용]
-    - <table style="width:100%; border-collapse:collapse; font-family:'Malgun Gothic',sans-serif; font-size:12px; border:1px solid #ddd;">
-    - <th style="background-color:#f2f2f2; border:1px solid #ddd; padding:8px; font-weight:bold; text-align:center;">
-    - <td style="border:1px solid #ddd; padding:8px; text-align:left;">
-    - <td style="border:1px solid #ddd; padding:8px; text-align:center;"> (번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자, 요약(AI))
-    """
-
-    # [설정] 사용자 메시지 (데이터)
-    user_content = f"데이터(총 {len(issues)}건): {json.dumps(issues, ensure_ascii=False)}"
-
-    # [수정 1] 용량이 큰 32k 모델을 1순위로 변경
-    candidate_models = ["moonshot-v1-32k", "moonshot-v1-8k", "kimi-k2.5"]
-    
-    # URL은 성공하신 주소 그대로 사용
-    url = "https://api.moonshot.ai/v1/chat/completions" 
-    # (참고: 공식 문서는 .cn이지만 .ai로 성공하셨다면 .ai로 쓰셔도 무방합니다. 
-    #  혹시 .cn으로 다시 실패하면 성공했던 url로 바꿔주세요.)
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {KIMI_API_KEY}"
-    }
-
-    last_error = ""
-
-    for model in candidate_models:
-        try:
-            print(f"🤖 Kimi(Moonshot) 호출 시도: {model} ...")
-            
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content}
-                ],
-                "temperature": 0.3,
-                # [수정 2] 답변 길이 제한 해제 (최대 4096 토큰까지 허용)
-                # 이 부분이 없으면 기본값이 작아서 답변이 잘립니다.
-                "max_tokens": 4096 
-            }
-
-            # 대량 데이터 처리를 위해 타임아웃 120초 설정
-            res = requests.post(url, headers=headers, json=payload, timeout=120)
-            
-            if res.status_code == 200:
-                print(f"✅ AI 리포트 생성 성공! (모델: {model})")
-                
-                # 응답 파싱
-                raw_text = res.json()['choices'][0]['message']['content']
-                clean_html = raw_text.replace('```html', '').replace('```', '').strip()
-                
-                # [순서 강제 조립]
-                greeting_html = f"<h2>안녕하세요, {date_str} QA 등록 이슈 리포트입니다.</h2>"
-                success_msg = f"<div style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 10px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: Kimi - {model})</div>"
-                
-                clean_html = clean_html.replace(f"안녕하세요, {date_str} QA 등록 이슈 리포트입니다.", "")
-                clean_html = clean_html.replace("<h2></h2>", "")
-
-                final_html = greeting_html + success_msg + clean_html
-                
-                return final_html
-
-            elif res.status_code == 429:
-                print("⏳ 사용량 제한(Rate Limit), 5초 대기...")
-                time.sleep(5)
-            else:
-                try:
-                    error_json = res.json()
-                    if "error" in error_json:
-                        e_msg = error_json["error"].get("message", "메시지 없음")
-                        e_type = error_json["error"].get("type", "알 수 없음")
-                        detailed_msg = f"{e_msg} (Type: {e_type})"
-                    else:
-                        detailed_msg = str(error_json)
-                except:
-                    detailed_msg = res.text[:200]
-
-                last_error = f"{model} Error ({res.status_code}): {detailed_msg}"
-                print(f"⚠️ [실패 상세] {last_error}")
-
-        except Exception as e:
-            last_error = f"시스템 예외 발생: {str(e)}"
-            print(f"⚠️ 에러 발생: {e}")
-            continue
-
-    return generate_manual_report(date_str, issues, last_error)
-
-# ==========================================
 # 5. 메일 발송 (다중 수신자 지원 수정됨)
 # ==========================================
 def send_email(subject, body):
@@ -371,8 +257,7 @@ def send_email(subject, body):
 if __name__ == "__main__":
     y_date, issues = get_yesterday_issues()
     if issues:
-        #final_html = ask_gemini(y_date, issues)
-        final_html = ask_kimi(y_date, issues)
+        final_html = ask_gemini(y_date, issues)
         send_email(f"[일일보고] {y_date} QA 등록 이슈 현황", final_html)
     else:
         send_email(f"[일일보고] {y_date} QA 등록 이슈 없음", f"<h3>{y_date} 등록된 QA 이슈가 없습니다.</h3>")
