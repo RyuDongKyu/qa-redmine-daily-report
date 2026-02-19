@@ -312,11 +312,25 @@ def ask_kimi(date_str, issues):
                 print("⏳ 사용량 제한(Rate Limit), 5초 대기...")
                 time.sleep(5)
             else:
-                last_error = f"{model} Error ({res.status_code}): {res.text}"
-                print(f"⚠️ {last_error}")
+                # [수정] 상세 에러 메시지 파싱 로직 추가
+                try:
+                    error_json = res.json()
+                    # Moonshot/OpenAI 에러 포맷: { "error": { "message": "...", "type": "..." } }
+                    if "error" in error_json:
+                        e_msg = error_json["error"].get("message", "메시지 없음")
+                        e_type = error_json["error"].get("type", "알 수 없음")
+                        detailed_msg = f"{e_msg} (Type: {e_type})"
+                    else:
+                        detailed_msg = str(error_json)
+                except:
+                    # JSON 파싱 실패 시 원문 텍스트 사용 (너무 길면 자름)
+                    detailed_msg = res.text[:200]
+
+                last_error = f"{model} Error ({res.status_code}): {detailed_msg}"
+                print(f"⚠️ [실패 상세] {last_error}")
 
         except Exception as e:
-            last_error = str(e)
+            last_error = f"시스템 예외 발생: {str(e)}"
             print(f"⚠️ 에러 발생: {e}")
             continue
 
