@@ -14,14 +14,17 @@ import time
 # 1. 환경 설정
 # ==========================================
 #GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-KIMI_API_KEY = "sk-SPxW7WGs5i5bThj301oHl5hNcCxLTOBb42TEB9DduxxxLxIP"
-#KIMI_API_KEY = os.getenv("KIMI_API_KEY")
+KIMI_API_KEY = os.getenv("KIMI_API_KEY")
 SHEET_ID = os.getenv("SHEET_ID")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 JSON_KEY_FILE = "service_key.json"
 
+if KIMI_API_KEY:
+    print(f"🔑 API Key 로드 성공! (길이: {len(KIMI_API_KEY)})")
+else:
+    print("❌ API Key가 로드되지 않았습니다! (None 상태)")
 # ==========================================
 # 2. 데이터 추출 (KST 시간 보정 + 제외 로직)
 # ==========================================
