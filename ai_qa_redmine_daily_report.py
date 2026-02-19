@@ -38,8 +38,7 @@ def get_yesterday_issues():
 
     # [수정] 날짜 계산 로직: 월요일이면 금~일 데이터 추출
     utc_now = datetime.utcnow()
-    #kst_now = utc_now + timedelta(hours=9)
-    kst_now = datetime(2026, 2, 16, 9, 0, 0)
+    kst_now = utc_now + timedelta(hours=9)
     current_weekday = kst_now.weekday()  # 0:월, 1:화, ..., 6:일
 
     target_dates = []
