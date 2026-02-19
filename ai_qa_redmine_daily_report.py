@@ -267,7 +267,8 @@ def ask_kimi(date_str, issues):
     # 8k 모델을 우선 시도하고, 실패 시 32k나 다른 모델 시도 가능
     candidate_models = ["kimi-k2.5", "moonshot-v1-8k", "moonshot-v1-32k"]
     
-    url = "https://api.moonshot.cn/v1/chat/completions"
+    #url = "https://api.moonshot.cn/v1/chat/completions"
+    url = "https://api.moonshot.ai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {KIMI_API_KEY}"
