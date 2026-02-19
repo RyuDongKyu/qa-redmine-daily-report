@@ -21,10 +21,14 @@ SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 JSON_KEY_FILE = "service_key.json"
 
-if KIMI_API_KEY:
-    print(f"🔑 API Key 로드 성공! (길이: {len(KIMI_API_KEY)})")
+if raw_key:
+    # 1. 앞뒤 공백 제거 (.strip)
+    # 2. 따옴표 제거 (.replace)
+    KIMI_API_KEY = raw_key.strip().replace('"', '').replace("'", "")
+    print(f"🔑 API Key 로드 및 정제 완료! (길이: {len(KIMI_API_KEY)})")
 else:
-    print("❌ API Key가 로드되지 않았습니다! (None 상태)")
+    KIMI_API_KEY = None
+    print("❌ API Key가 없습니다.")
 # ==========================================
 # 2. 데이터 추출 (KST 시간 보정 + 제외 로직)
 # ==========================================
