@@ -252,6 +252,7 @@ def ask_kimi(date_str, issues):
     4. 요약(AI) 처리: 'content'를 **반드시 한국어 두 문장**으로 핵심만 요약하여 '요약(AI)' 컬럼에 넣을 것.
     5. 링크 생성: 번호(#no)에는 반드시 <a href="https://projects.rsupport.com/issues/{{no}}">#{{no}}</a> 링크를 적용할 것.
     6. 데이터 변형 금지: 제목, 번호(#no), 등록일, 상태, 유형, 우선순위, 제목, 등록자, 담당자 등의 텍스트는 원문 그대로 유지할 것.
+    7. **누락 금지:** 입력된 {len(issues)}개의 이슈를 하나도 빠짐없이 모두 테이블에 출력할 것.
 
     [인라인 HTML 가이드 - 필수 적용]
     - <table style="width:100%; border-collapse:collapse; font-family:'Malgun Gothic',sans-serif; font-size:12px; border:1px solid #ddd;">
@@ -261,14 +262,16 @@ def ask_kimi(date_str, issues):
     """
 
     # [설정] 사용자 메시지 (데이터)
-    user_content = f"데이터: {json.dumps(issues, ensure_ascii=False)}"
+    user_content = f"데이터(총 {len(issues)}건): {json.dumps(issues, ensure_ascii=False)}"
 
-    # [변경] Moonshot API 사용 (Kimi)
-    # 8k 모델을 우선 시도하고, 실패 시 32k나 다른 모델 시도 가능
-    candidate_models = ["kimi-k2.5", "moonshot-v1-8k", "moonshot-v1-32k"]
+    # [수정 1] 용량이 큰 32k 모델을 1순위로 변경
+    candidate_models = ["moonshot-v1-32k", "moonshot-v1-8k", "kimi-k2.5"]
     
-    #url = "https://api.moonshot.cn/v1/chat/completions"
-    url = "https://api.moonshot.ai/v1/chat/completions"
+    # URL은 성공하신 주소 그대로 사용
+    url = "https://api.moonshot.ai/v1/chat/completions" 
+    # (참고: 공식 문서는 .cn이지만 .ai로 성공하셨다면 .ai로 쓰셔도 무방합니다. 
+    #  혹시 .cn으로 다시 실패하면 성공했던 url로 바꿔주세요.)
+
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {KIMI_API_KEY}"
@@ -286,7 +289,10 @@ def ask_kimi(date_str, issues):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content}
                 ],
-                "temperature": 0.3
+                "temperature": 0.3,
+                # [수정 2] 답변 길이 제한 해제 (최대 4096 토큰까지 허용)
+                # 이 부분이 없으면 기본값이 작아서 답변이 잘립니다.
+                "max_tokens": 4096 
             }
 
             # 대량 데이터 처리를 위해 타임아웃 120초 설정
@@ -295,23 +301,17 @@ def ask_kimi(date_str, issues):
             if res.status_code == 200:
                 print(f"✅ AI 리포트 생성 성공! (모델: {model})")
                 
-                # 응답 파싱 (OpenAI 포맷 호환)
+                # 응답 파싱
                 raw_text = res.json()['choices'][0]['message']['content']
                 clean_html = raw_text.replace('```html', '').replace('```', '').strip()
                 
-                # [순서 강제 조립] 인사말 -> 성공메시지 -> 테이블
-                
-                # 1. 인사말
+                # [순서 강제 조립]
                 greeting_html = f"<h2>안녕하세요, {date_str} QA 등록 이슈 리포트입니다.</h2>"
-                
-                # 2. 파란색 성공 메시지
                 success_msg = f"<div style='color: #0052cc; font-size: 12px; font-weight: bold; margin-top: 10px; margin-bottom: 20px;'>✅ AI 분석 완료 (사용 모델: Kimi - {model})</div>"
                 
-                # 3. AI가 실수로 넣었을지 모를 인사말 제거
                 clean_html = clean_html.replace(f"안녕하세요, {date_str} QA 등록 이슈 리포트입니다.", "")
                 clean_html = clean_html.replace("<h2></h2>", "")
 
-                # 4. 최종 합치기
                 final_html = greeting_html + success_msg + clean_html
                 
                 return final_html
@@ -320,10 +320,8 @@ def ask_kimi(date_str, issues):
                 print("⏳ 사용량 제한(Rate Limit), 5초 대기...")
                 time.sleep(5)
             else:
-                # [수정] 상세 에러 메시지 파싱 로직 추가
                 try:
                     error_json = res.json()
-                    # Moonshot/OpenAI 에러 포맷: { "error": { "message": "...", "type": "..." } }
                     if "error" in error_json:
                         e_msg = error_json["error"].get("message", "메시지 없음")
                         e_type = error_json["error"].get("type", "알 수 없음")
@@ -331,7 +329,6 @@ def ask_kimi(date_str, issues):
                     else:
                         detailed_msg = str(error_json)
                 except:
-                    # JSON 파싱 실패 시 원문 텍스트 사용 (너무 길면 자름)
                     detailed_msg = res.text[:200]
 
                 last_error = f"{model} Error ({res.status_code}): {detailed_msg}"
