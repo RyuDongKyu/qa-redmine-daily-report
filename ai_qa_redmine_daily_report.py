@@ -14,6 +14,7 @@ import time
 # 1. 환경 설정
 # ==========================================
 #GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+#KIMI_API_KEY = "sk-SPxW7WGs5i5bThj301oHl5hNcCxLTOBb42TEB9DduxxxLxIP"
 KIMI_API_KEY = os.getenv("KIMI_API_KEY")
 SHEET_ID = os.getenv("SHEET_ID")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
